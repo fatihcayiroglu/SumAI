@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SumAI — Asistan</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+  import {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signInWithRedirect,
+    getRedirectResult,
+    signInWithEmailAndPassword,
+    createUserWithEmailAndPassword, sendPasswordResetEmail,
+    onAuthStateChanged, signOut
+  } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+  // ⚠️ Kendi Firebase config'ini buraya yapıştır
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDlbzH9-3IZIxPl4HD8FK9Gddnm1XGxpBU",
+    authDomain:        "sumai-a3051.firebaseapp.com",
+    projectId:         "sumai-a3051",
+    storageBucket:     "sumai-a3051.firebasestorage.app",
+    messagingSenderId: "383859146119",
+    appId:             "1:383859146119:web:ab91297588f9d078916722",
+    measurementId:     "G-GZT5LG500S"
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  const auth  = getAuth(fbApp);
+
+  window._firebaseAuth                   = auth;
+  window._GoogleProvider                 = GoogleAuthProvider;
+  window._signInWithPopup                = signInWithPopup;
+  window._signInWithRedirect             = signInWithRedirect;
+  window._getRedirectResult              = getRedirectResult;
+  window._signInWithEmailAndPassword     = signInWithEmailAndPassword;
+  window._createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+  window._sendPasswordResetEmail         = sendPasswordResetEmail;
+  window._onAuthStateChanged             = onAuthStateChanged;
+  window._signOut                        = signOut;
+  window._firebaseReady                  = true;
+  if (window._firebaseReadyResolve) window._firebaseReadyResolve();
+
+  // Redirect sonucunu yakala (sayfa yenilendikten sonra)
+  getRedirectResult(auth).then(result => {
+    if (result?.user) window.onFirebaseLogin?.(result.user);
+  }).catch(() => {});
+
+  onAuthStateChanged(auth, user => {
+    if (user) { window._firebaseUser = user; window.onFirebaseLogin?.(user); }
+    else      { window._firebaseUser = null; window.onFirebaseLogout?.(); }
+  });
+</script>
+
+<style>
+/* ── Variables ─────────────────────────────────── */
+:root[data-theme="dark"] {
+  --bg:#080b0f; --surface:#0f1318; --surface2:#161c23; --surface3:#1d2530;
+  --border:#232d38; --accent:#3ecf8e; --accent-dim:rgba(62,207,142,.15);
+  --accent2:#5b8dee; --text:#dde3ec; --text-dim:#7a8898; --text-muted:#3a4452;
+  --user-bg:#112035; --ai-bg:#0f1318; --shadow:rgba(0,0,0,.6); --scrollbar:#232d38;
+  --danger:#e05c5c; --warn:#f5a623;
+}
+:root[data-theme="light"] {
+  --bg:#f0f2f5; --surface:#fff; --surface2:#f7f8fa; --surface3:#eef0f3;
+  --border:#e0e4ea; --accent:#0f9e63; --accent-dim:rgba(15,158,99,.1);
+  --accent2:#3b6fcc; --text:#1a2130; --text-dim:#5a6880; --text-muted:#b0bac8;
+  --user-bg:#e8f5ee; --ai-bg:#fff; --shadow:rgba(0,0,0,.08); --scrollbar:#d8dce3;
+  --danger:#c0392b; --warn:#d68910;
+}
+
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{font-family:'Instrument Sans',sans-serif;background:var(--bg);color:var(--text);
+  display:flex;flex-direction:column;height:100vh;overflow:hidden;transition:background .3s,color .3s;}
+
+/* ── Auth overlay ─────────────────────────────── */
+.login-overlay{position:fixed;inset:0;background:rgba(8,11,15,.97);backdrop-filter:blur(8px);
+  z-index:9999;display:flex;align-items:center;justify-content:center;}
+.login-box{background:var(--surface);padding:44px 40px 36px;border-radius:22px;
+  border:1px solid var(--border);text-align:center;width:360px;
+  box-shadow:0 20px 50px var(--shadow);animation:fadeUp .45s ease;}
+.login-logo{width:52px;height:52px;border-radius:14px;
+  background:linear-gradient(135deg,var(--accent2),var(--accent));
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:#fff;margin:0 auto 18px;}
+.login-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;margin-bottom:6px;}
+.login-sub{font-size:13px;color:var(--text-dim);margin-bottom:28px;line-height:1.5;}
+.auth-tabs{display:flex;gap:6px;background:var(--surface2);border-radius:10px;padding:4px;margin-bottom:24px;}
+.auth-tab{flex:1;padding:9px;border:none;border-radius:7px;background:transparent;
+  color:var(--text-dim);font-family:'Instrument Sans',sans-serif;font-size:13px;
+  font-weight:600;cursor:pointer;transition:all .2s;}
+.auth-tab.active{background:var(--surface);color:var(--text);box-shadow:0 2px 8px var(--shadow);}
+.auth-panel{display:none;} .auth-panel.active{display:block;}
+.google-btn{width:100%;padding:13px 16px;display:flex;align-items:center;justify-content:center;gap:12px;
+  background:var(--surface2);border:1.5px solid var(--border);border-radius:11px;
+  color:var(--text);font-family:'Instrument Sans',sans-serif;font-size:15px;font-weight:600;
+  cursor:pointer;transition:all .2s;}
+.google-btn:hover{border-color:var(--accent);background:var(--accent-dim);transform:translateY(-1px);}
+.google-icon{width:20px;height:20px;flex-shrink:0;}
+.phone-field{flex:1;padding:13px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--text);font-family:'Instrument Sans',sans-serif;
+  font-size:15px;outline:none;transition:border-color .2s;}
+.phone-field:focus{border-color:var(--accent);}
+.phone-field::placeholder{color:var(--text-muted);}
+.auth-btn{width:100%;padding:13px;background:var(--accent);color:white;border:none;
+  border-radius:11px;cursor:pointer;font-family:'Instrument Sans',sans-serif;
+  font-weight:600;font-size:15px;transition:all .2s;margin-bottom:8px;}
+.auth-btn:hover{opacity:.9;transform:translateY(-1px);}
+.auth-btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+.back-link{background:none;border:none;color:var(--text-muted);font-size:12px;
+  font-family:'Instrument Sans',sans-serif;cursor:pointer;text-decoration:underline;transition:color .2s;}
+.back-link:hover{color:var(--text-dim);}
+.auth-error{font-size:12px;color:var(--danger);margin-top:8px;min-height:18px;text-align:left;}
+
+/* ── Header ───────────────────────────────────── */
+header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;
+  height:58px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo-mark{width:30px;height:30px;border-radius:8px;
+  background:linear-gradient(135deg,var(--accent2),var(--accent));
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-weight:800;font-size:14px;color:#fff;}
+.logo-text{font-family:'Syne',sans-serif;font-weight:700;font-size:18px;letter-spacing:-.3px;}
+.logo-badge{font-size:10px;font-weight:600;color:var(--accent);
+  background:var(--accent-dim);padding:2px 7px;border-radius:20px;letter-spacing:.5px;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.hdr-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;
+  border:1px solid var(--border);background:transparent;color:var(--text-dim);
+  font-family:'Instrument Sans',sans-serif;font-size:12px;font-weight:500;
+  cursor:pointer;transition:all .2s;}
+.hdr-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.hdr-btn .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;}
+.user-avatar{width:30px;height:30px;border-radius:50%;object-fit:cover;border:1.5px solid var(--accent);}
+.user-avatar-placeholder{width:30px;height:30px;border-radius:50%;background:var(--surface3);
+  border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:var(--text-dim);}
+.logout-btn{padding:5px 10px;border-radius:7px;border:1px solid var(--border);
+  background:transparent;color:var(--text-muted);font-family:'Instrument Sans',sans-serif;
+  font-size:11px;cursor:pointer;transition:all .2s;}
+.logout-btn:hover{border-color:var(--danger);color:var(--danger);}
+
+/* ── Layout ───────────────────────────────────── */
+.app{display:flex;flex:1;overflow:hidden;}
+.sidebar{width:260px;min-width:260px;background:var(--surface);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.sidebar-header{padding:16px 18px 12px;border-bottom:1px solid var(--border);}
+.sidebar-title{font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:10px;}
+.new-chat-btn{display:flex;align-items:center;gap:8px;width:100%;padding:9px 12px;
+  background:var(--accent);border:none;border-radius:8px;color:#fff;
+  font-family:'Instrument Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .2s;}
+.new-chat-btn:hover{opacity:.88;}
+
+/* Model Selection */
+.model-selection { padding: 0 16px 12px; border-bottom: 1px solid var(--border); }
+.model-checkbox { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); margin-bottom: 8px; cursor: pointer; }
+.model-checkbox input { accent-color: var(--accent); cursor: pointer; width: 14px; height: 14px; }
+
+.mode-list{padding:12px 10px; border-bottom:1px solid var(--border);}
+.mode-btn{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;
+  background:transparent;border:none;border-radius:8px;color:var(--text-dim);
+  font-family:'Instrument Sans',sans-serif;font-size:13px;font-weight:500;
+  cursor:pointer;transition:all .2s;margin-bottom:3px;text-align:left;}
+.mode-btn:hover{background:var(--surface2);color:var(--text);}
+.mode-btn.active{background:var(--accent-dim);color:var(--accent);}
+.history-section{flex:1;overflow-y:auto;padding:12px 10px;
+  scrollbar-width:thin;scrollbar-color:var(--scrollbar) transparent;}
+.hist-label{font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--text-muted);padding:0 8px;margin-bottom:8px;}
+
+/* History Items & Delete Button */
+.hist-item-wrap { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-bottom: 3px; border-radius: 8px; transition: background .2s; }
+.hist-item-wrap:hover { background: var(--surface2); }
+.hist-item{flex:1; padding:9px 10px; border-radius:8px; cursor:pointer; overflow:hidden;}
+.hist-item.active{background:var(--surface2); border-left:2px solid var(--accent); border-radius: 0 8px 8px 0;}
+.hist-title{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+.hist-time{font-size:11px;color:var(--text-muted);margin-top:2px;}
+.hist-del-btn { background: none; border: none; color: var(--text-muted); padding: 6px; border-radius: 6px; cursor: pointer; opacity: 0; transition: all 0.2s; font-size: 13px; margin-right: 4px; }
+.hist-item-wrap:hover .hist-del-btn { opacity: 1; }
+.hist-del-btn:hover { background: var(--surface3); color: var(--danger); }
+.hist-empty{font-size:12px;color:var(--text-muted);padding:8px;}
+
+/* ── Stats mini panel ─────────────────────────── */
+.stats-panel{padding:12px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted);}
+.stats-row{display:flex;justify-content:space-between;margin-bottom:4px;}
+.stats-model{display:flex;align-items:center;gap:5px;}
+.stats-bar{flex:1;height:4px;border-radius:2px;background:var(--surface3);overflow:hidden;margin:0 8px;}
+.stats-bar-fill{height:100%;border-radius:2px;background:var(--accent);transition:width .5s;}
+
+/* ── Chat main ────────────────────────────────── */
+.chat-main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.pdf-banner{display:none;align-items:center;gap:10px;padding:9px 20px;
+  background:var(--surface2);border-bottom:1px solid var(--border);font-size:12px;color:var(--text-dim);}
+.pdf-banner.on{display:flex;}
+.pdf-fn{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);}
+.pdf-rm{margin-left:auto;background:none;border:none;color:var(--text-muted);cursor:pointer;
+  font-size:16px;transition:color .2s;}
+.pdf-rm:hover{color:var(--text);}
+.messages{flex:1;overflow-y:auto;padding:28px 0;
+  scrollbar-width:thin;scrollbar-color:var(--scrollbar) transparent;}
+.msg-wrap{max-width:780px;margin:0 auto;padding:0 24px;}
+.welcome{text-align:center;padding:64px 20px 32px;animation:fadeUp .5s ease;}
+.welcome-icon{font-size:44px;margin-bottom:14px;display:inline-block;animation:float 3s ease-in-out infinite;}
+.welcome h1{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;margin-bottom:8px;}
+.welcome p{color:var(--text-dim);font-size:14px;line-height:1.6;max-width:380px;margin:0 auto 28px;}
+.quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:480px;margin:0 auto;}
+.quick-card{padding:12px 14px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface);cursor:pointer;transition:all .2s;text-align:left;}
+.quick-card:hover{border-color:var(--accent);background:var(--accent-dim);}
+.qc-icon{font-size:18px;margin-bottom:4px;}
+.qc-title{font-size:13px;font-weight:600;}
+.qc-sub{font-size:11px;color:var(--text-dim);margin-top:2px;}
+
+/* ── Messages ─────────────────────────────────── */
+.message{display:flex;gap:12px;margin-bottom:24px;animation:fadeUp .25s ease;}
+.message.user{flex-direction:row-reverse;}
+.avatar{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;
+  justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px;overflow:hidden;}
+.avatar.ai{background:linear-gradient(135deg,var(--accent2),var(--accent));color:white;}
+.avatar.user{background:var(--surface3);border:1px solid var(--border);font-size:12px;
+  color:var(--text-dim);font-weight:700;}
+.avatar.user img{width:100%;height:100%;object-fit:cover;border-radius:9px;}
+.msg-body{display:flex;flex-direction:column;gap:6px;max-width:600px;}
+.message.user .msg-body{align-items:flex-end;}
+.bubble{padding:12px 16px;border-radius:12px;font-size:14px;line-height:1.65;}
+.message.user .bubble{background:var(--user-bg);border:1px solid rgba(62,207,142,.2);
+  border-top-right-radius:3px;}
+.message.ai .bubble{background:var(--ai-bg);border:1px solid var(--border);border-top-left-radius:3px;}
+.bubble p{margin-bottom:8px;} .bubble p:last-child{margin-bottom:0;}
+.bubble strong{color:var(--accent);font-weight:600;}
+.bubble code{font-family:'JetBrains Mono',monospace;font-size:12px;
+  background:var(--surface3);padding:2px 5px;border-radius:4px;color:var(--accent2);}
+.bubble pre{background:var(--surface3);border:1px solid var(--border);border-radius:8px;
+  padding:12px;margin:8px 0;overflow-x:auto;}
+.bubble pre code{background:none;padding:0;}
+
+/* ── Model badge + actions ────────────────────── */
+.msg-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.model-badge{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;
+  padding:2px 7px;border-radius:4px;border:1px solid var(--border);
+  color:var(--text-muted);background:var(--surface2);letter-spacing:.3px;}
+.model-badge.gemini{color:#10b981;border-color:rgba(16,185,129,.3);background:rgba(16,185,129,.08);}
+.model-badge.gpt{color:#a855f7;border-color:rgba(168,85,247,.3);background:rgba(168,85,247,.08);}
+.model-badge.ollama{color:#f59e0b;border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.08);}
+.cached-badge{font-size:10px;color:var(--text-muted);opacity:.6;}
+
+/* Thumbs vote */
+.vote-btns{display:flex;gap:4px;}
+.vote-btn{background:none;border:1px solid var(--border);border-radius:6px;
+  padding:2px 7px;font-size:12px;cursor:pointer;color:var(--text-muted);
+  transition:all .2s;font-family:'Instrument Sans',sans-serif;}
+.vote-btn:hover{border-color:var(--accent);color:var(--accent);}
+.vote-btn.voted{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+
+/* Race bar */
+.race-bar{font-size:11px;color:var(--text-muted);display:flex;gap:8px;
+  flex-wrap:wrap;padding:4px 0;}
+.race-item{display:flex;align-items:center;gap:4px;}
+.race-dot{width:6px;height:6px;border-radius:50%;}
+.race-dot.gemini{background:#10b981;} .race-dot.gpt{background:#a855f7;} .race-dot.ollama{background:#f59e0b;}
+.race-winner{font-weight:600;color:var(--text);}
+
+/* Typing */
+.typing{display:flex;gap:5px;padding:4px 0;align-items:center;}
+.typing span{width:6px;height:6px;background:var(--accent);border-radius:50%;
+  animation:bounce 1.1s infinite;opacity:.7;}
+.typing span:nth-child(2){animation-delay:.18s;}
+.typing span:nth-child(3){animation-delay:.36s;}
+
+/* ── Input area ───────────────────────────────── */
+.input-area{padding:14px 24px 18px;background:var(--surface);border-top:1px solid var(--border);}
+.input-box{max-width:780px;margin:0 auto;}
+.input-row{display:flex;gap:8px;align-items:flex-end;background:var(--surface2);
+  border:1px solid var(--border);border-radius:12px;padding:8px 10px;transition:border-color .2s;}
+.input-row:focus-within{border-color:var(--accent);}
+.attach-btn{width:34px;height:34px;border-radius:8px;background:transparent;
+  border:1px solid var(--border);color:var(--text-muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:16px;
+  transition:all .2s;flex-shrink:0;}
+.attach-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+textarea{flex:1;background:transparent;border:none;outline:none;color:var(--text);
+  font-family:'Instrument Sans',sans-serif;font-size:14px;resize:none;max-height:130px;
+  line-height:1.5;padding:5px 4px;}
+textarea::placeholder{color:var(--text-muted);}
+.send-btn{width:34px;height:34px;border-radius:8px;background:var(--accent);border:none;
+  color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:16px;transition:all .2s;flex-shrink:0;}
+.send-btn:hover{opacity:.85;transform:translateY(-1px);}
+.send-btn:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+.input-meta{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:0 2px;}
+.input-hint{font-size:11px;color:var(--text-muted);}
+.model-tag{font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;}
+
+/* ── Image preview in input ───────────────────── */
+.img-preview-wrap{display:none;align-items:center;gap:8px;padding:8px 12px 0;
+  background:var(--surface2);border-radius:10px 10px 0 0;border:1px solid var(--border);
+  border-bottom:none;margin-bottom:-4px;}
+.img-preview-wrap.on{display:flex;}
+.img-preview-thumb{width:48px;height:48px;border-radius:8px;object-fit:cover;
+  border:1px solid var(--border);}
+.img-preview-name{font-size:12px;color:var(--text-dim);flex:1;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;font-family:'JetBrains Mono',monospace;}
+.img-preview-rm{background:none;border:none;color:var(--text-muted);cursor:pointer;
+  font-size:16px;padding:4px;border-radius:6px;transition:color .2s;}
+.img-preview-rm:hover{color:var(--danger);}
+
+/* Image bubble in messages */
+.bubble img.msg-img{max-width:100%;max-height:320px;border-radius:10px;
+  display:block;margin-bottom:8px;border:1px solid var(--border);}
+
+/* ── Animations ───────────────────────────────── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+</head>
+<body>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">S</div>
+    <div class="login-title" data-i18n="loginTitle">SumAI'ye Giriş</div>
+    <div class="login-sub" data-i18n="loginSub">Devam etmek için hesabınla giriş yap</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-google" onclick="switchTab('google')" data-i18n="tabGoogle">🔵 Google</button>
+      <button class="auth-tab" id="tab-email" onclick="switchTab('email')" data-i18n="tabEmail">✉️ E-posta</button>
+    </div>
+    <div class="auth-panel active" id="panel-google">
+      <button class="google-btn" onclick="loginWithGoogle()">
+        <svg class="google-icon" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        <span data-i18n="btnGoogle">Google ile Giriş Yap</span>
+      </button>
+      <div class="auth-error" id="google-error"></div>
+    </div>
+    <div class="auth-panel" id="panel-email">
+      <div id="email-register-view">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;text-align:left;" data-i18n="createNewAcc">Yeni hesap oluştur</div>
+        <input class="phone-field" id="regEmailInput" type="email" placeholder="E-posta" data-i18n="emailPlaceholder" style="width:100%;margin-bottom:10px;" onkeydown="if(event.key==='Enter')document.getElementById('regPasswordInput').focus()">
+        <input class="phone-field" id="regPasswordInput" type="password" placeholder="Şifre (min. 6 karakter)" data-i18n="passPlaceholder" style="width:100%;margin-bottom:12px;" onkeydown="if(event.key==='Enter')registerWithEmail()">
+        <button class="auth-btn" id="emailRegisterBtn" onclick="registerWithEmail()" data-i18n="btnSignUp">Kayıt Ol</button>
+        <div style="margin-top:10px;font-size:12px;color:var(--text-muted);">
+          <span data-i18n="alreadyHaveAcc">Zaten hesabın var mı?</span> <button class="back-link" style="font-size:12px;" onclick="showEmailLogin()" data-i18n="toLogin">Giriş Yap →</button>
+        </div>
+        <div class="auth-error" id="email-register-error"></div>
+      </div>
+      <div id="email-login-view" style="display:none;">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;text-align:left;" data-i18n="existAcc">Mevcut hesabınla giriş yap</div>
+        <input class="phone-field" id="emailInput" type="email" placeholder="E-posta" data-i18n="emailPlaceholder" style="width:100%;margin-bottom:10px;" onkeydown="if(event.key==='Enter')document.getElementById('passwordInput').focus()">
+        <input class="phone-field" id="passwordInput" type="password" placeholder="Şifre" data-i18n="pass" style="width:100%;margin-bottom:12px;" onkeydown="if(event.key==='Enter')loginWithEmail()">
+        <button class="auth-btn" id="emailLoginBtn" onclick="loginWithEmail()" data-i18n="btnLogin">Giriş Yap</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+          <span style="font-size:12px;color:var(--text-muted);"><span data-i18n="dontHaveAcc">Hesabın yok mu?</span> <button class="back-link" style="font-size:12px;" onclick="showEmailRegister()" data-i18n="toSignUp">Kayıt Ol →</button></span>
+          <button class="back-link" style="font-size:12px;" onclick="showForgotPassword()" data-i18n="forgotPass">Şifremi unuttum</button>
+        </div>
+        <div class="auth-error" id="email-error"></div>
+      </div>
+      <div id="email-reset-view" style="display:none;">
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:14px;text-align:left;" data-i18n="resetMsg">📧 Şifre sıfırlama bağlantısı gönderilecek.</div>
+        <input class="phone-field" id="resetEmailInput" type="email" placeholder="E-posta" data-i18n="emailPlaceholder" style="width:100%;margin-bottom:12px;" onkeydown="if(event.key==='Enter')sendReset()">
+        <button class="auth-btn" id="resetBtn" onclick="sendReset()" data-i18n="btnReset">Şifre Sıfırlama Gönder</button>
+        <button class="back-link" style="margin-top:8px;" onclick="showEmailLogin()" data-i18n="backToLogin">← Giriş ekranına dön</button>
+        <div class="auth-error" id="reset-error"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">S</div>
+    <div class="logo-text">SumAI</div>
+    <span class="logo-badge" data-i18n="assistant">ASİSTAN</span>
+  </div>
+  <div class="header-right">
+    <div id="userAvatarWrap" style="display:none;align-items:center;gap:8px;">
+      <div id="userAvatarEl"></div>
+      <span id="welcomeUser" style="font-size:13px;font-weight:500;color:var(--text-dim);"></span>
+      <button class="logout-btn" onclick="doLogout()" data-i18n="logout">Çıkış</button>
+    </div>
+    <button class="hdr-btn" id="statusBtn">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText" data-i18n="connecting">Bağlanıyor...</span>
+    </button>
+    <button class="hdr-btn" onclick="toggleLang()">
+      <span id="langIcon">🇹🇷</span>
+      <span id="langLabel">TR</span>
+    </button>
+    <button class="hdr-btn" onclick="toggleTheme()">
+      <span id="themeIcon">☀️</span>
+      <span id="themeLabel" data-i18n="themeLight">Aydınlık</span>
+    </button>
+  </div>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title" data-i18n="assistant">Asistan</div>
+      <button class="new-chat-btn" onclick="newChat()" data-i18n="newChat">✦ Yeni Sohbet</button>
+    </div>
+
+    <div class="sidebar-title" style="margin: 16px 18px 8px;" data-i18n="modelsTitle">Modeller</div>
+    <div class="model-selection">
+      <label class="model-checkbox"><input type="checkbox" id="chk-gemini" checked onchange="toggleModel('gemini')"> Gemini 2.5 Flash</label>
+      <label class="model-checkbox"><input type="checkbox" id="chk-gpt" checked onchange="toggleModel('gpt')"> GPT-4o-mini</label>
+      <label class="model-checkbox"><input type="checkbox" id="chk-ollama" checked onchange="toggleModel('ollama')"> Llama3 (Ollama)</label>
+    </div>
+
+    <div class="mode-list">
+      <button class="mode-btn active" id="mode-genel"   onclick="setMode('genel')" data-i18n="modeGenel">💬 Genel Sohbet</button>
+      <button class="mode-btn"        id="mode-ozet"    onclick="setMode('ozet')" data-i18n="modeOzet">📄 Özetleme</button>
+      <button class="mode-btn"        id="mode-analiz"  onclick="setMode('analiz')" data-i18n="modeAnaliz">🔍 Analiz</button>
+      <button class="mode-btn"        id="mode-kod"     onclick="setMode('kod')" data-i18n="modeKod">💻 Kod Yardımı</button>
+      <button class="mode-btn"        id="mode-tercume" onclick="setMode('tercume')" data-i18n="modeTercume">🌐 Çeviri</button>
+    </div>
+    <div class="history-section">
+      <div class="hist-label" data-i18n="historyTitle">Geçmiş</div>
+      <div id="histList"><div class="hist-empty" data-i18n="noHistory">Henüz geçmiş yok.</div></div>
+    </div>
+    
+    <div class="stats-panel" id="statsPanel" style="display:none;">
+      <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:8px;" data-i18n="statsTitle">Model Tercihlerin</div>
+      <div id="statsRows"></div>
+    </div>
+  </aside>
+
+  <main class="chat-main">
+    <div class="pdf-banner" id="pdfBanner">
+      📎 <span class="pdf-fn" id="pdfLabel">—</span>
+      <button class="pdf-rm" onclick="removePDF()">✕</button>
+    </div>
+
+    <div class="messages" id="messages">
+      </div>
+
+    <div class="input-area">
+      <div class="input-box">
+        <!-- Image preview strip (görünür olduğunda) -->
+        <div class="img-preview-wrap" id="imgPreviewWrap">
+          <img id="imgPreviewThumb" class="img-preview-thumb" src="" alt="">
+          <span class="img-preview-name" id="imgPreviewName"></span>
+          <button class="img-preview-rm" onclick="removeImage()" title="Kaldır">✕</button>
+        </div>
+        <div class="input-row">
+          <!-- Belge (PDF/DOCX/PPTX/TXT) -->
+          <button class="attach-btn" onclick="document.getElementById('fileIn').click()" title="PDF / DOCX / PPTX / TXT">📎</button>
+          <input type="file" id="fileIn" accept=".pdf,.txt,.docx,.pptx" style="display:none" onchange="uploadFile(event)">
+          <!-- Resim -->
+          <button class="attach-btn" onclick="document.getElementById('imgIn').click()" title="Resim gönder (JPG/PNG/WEBP)">🖼️</button>
+          <input type="file" id="imgIn" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="pickImage(event)">
+          <textarea id="userInput" placeholder="Bir şey sor..." data-i18n="inputPlaceholder" rows="1" onkeydown="onKey(event)" oninput="resize(this)"></textarea>
+          <button class="send-btn" id="sendBtn" onclick="send()">➤</button>
+        </div>
+        <div class="input-meta">
+          <span class="input-hint" data-i18n="inputHint">Enter gönder · Shift+Enter satır · Belge & Resim desteklenir</span>
+          <span class="model-tag" id="modelTag" data-i18n="online">Sistem hazır</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:3000' : window.location.origin;
+
+// ── DİL SİSTEMİ (i18n) ──────────────────────────
+const i18n = {
+  tr: {
+    loginTitle: "SumAI'ye Giriş", loginSub: "Devam etmek için hesabınla giriş yap",
+    tabGoogle: "🔵 Google", tabEmail: "✉️ E-posta", btnGoogle: "Google ile Giriş Yap",
+    createNewAcc: "Yeni hesap oluştur", emailPlaceholder: "E-posta", passPlaceholder: "Şifre (min. 6 karakter)",
+    pass: "Şifre", btnSignUp: "Kayıt Ol", alreadyHaveAcc: "Zaten hesabın var mı?", toLogin: "Giriş Yap →",
+    existAcc: "Mevcut hesabınla giriş yap", btnLogin: "Giriş Yap", dontHaveAcc: "Hesabın yok mu?",
+    toSignUp: "Kayıt Ol →", forgotPass: "Şifremi unuttum", resetMsg: "📧 Şifre sıfırlama bağlantısı gönderilecek.",
+    btnReset: "Şifre Sıfırlama Gönder", backToLogin: "← Giriş ekranına dön", logout: "Çıkış",
+    connecting: "Bağlanıyor...", online: "Sistem hazır", loading: "Model yükleniyor", offline: "Sunucu kapalı",
+    themeDark: "Karanlık", themeLight: "Aydınlık", assistant: "ASİSTAN", newChat: "✦ Yeni Sohbet",
+    modelsTitle: "Modeller", modeGenel: "💬 Genel Sohbet", modeOzet: "📄 Özetleme", modeAnaliz: "🔍 Analiz",
+    modeKod: "💻 Kod Yardımı", modeTercume: "🌐 Çeviri", historyTitle: "Geçmiş", noHistory: "Henüz geçmiş yok.",
+    statsTitle: "Model Tercihlerin", welcomeSub: "Yapay zeka modellerini yarıştırır, en iyisini sunarım.",
+    q1T: "Yaratıcı Yaz", q1S: "Şiir, hikaye, metin", q1Q: "Bana kısa bir şiir yaz",
+    q2T: "Özetle", q2S: "Metin veya Belgeler", q2Q: "Bu metni özetle: ",
+    q3T: "Kod Yaz", q3S: "Her dilde yardım", q3Q: "Python ile basit bir hesap makinesi kodu yaz",
+    q4T: "Açıkla", q4S: "Kavram & konu", q4Q: "Yapay zeka nedir? Kısaca açıkla.",
+    inputHint: "Enter gönder · Shift+Enter satır · DOCX/PPTX desteklenir", inputPlaceholder: "Bir şey sor...",
+    sysErr: "Sistem Hatası", connErr: "⚠️ Sunucuya bağlanılamadı. `node server.js` çalışıyor mu?",
+    modelReq: "Soru sorabilmek için en az bir yapay zeka modeli seçmelisin!", delConfirm: "Bu sohbeti silmek istediğine emin misin?"
+  },
+  en: {
+    loginTitle: "Login to SumAI", loginSub: "Log in with your account to continue",
+    tabGoogle: "🔵 Google", tabEmail: "✉️ Email", btnGoogle: "Login with Google",
+    createNewAcc: "Create new account", emailPlaceholder: "Email", passPlaceholder: "Password (min. 6 chars)",
+    pass: "Password", btnSignUp: "Sign Up", alreadyHaveAcc: "Already have an account?", toLogin: "Login →",
+    existAcc: "Log in with existing account", btnLogin: "Login", dontHaveAcc: "Don't have an account?",
+    toSignUp: "Sign Up →", forgotPass: "Forgot password", resetMsg: "📧 A password reset link will be sent.",
+    btnReset: "Send Reset Link", backToLogin: "← Back to login", logout: "Logout",
+    connecting: "Connecting...", online: "System ready", loading: "Loading models", offline: "Server offline",
+    themeDark: "Dark", themeLight: "Light", assistant: "ASSISTANT", newChat: "✦ New Chat",
+    modelsTitle: "Models", modeGenel: "💬 General Chat", modeOzet: "📄 Summarize", modeAnaliz: "🔍 Analysis",
+    modeKod: "💻 Code Help", modeTercume: "🌐 Translate", historyTitle: "History", noHistory: "No history yet.",
+    statsTitle: "Model Preferences", welcomeSub: "I race AI models and present the best one for you.",
+    q1T: "Creative Writing", q1S: "Poem, story, text", q1Q: "Write a short poem for me",
+    q2T: "Summarize", q2S: "Text or Docs", q2Q: "Summarize this text: ",
+    q3T: "Code Help", q3S: "Any language", q3Q: "Write a simple calculator code in Python",
+    q4T: "Explain", q4S: "Concepts & topics", q4Q: "What is AI? Explain briefly.",
+    inputHint: "Enter to send · Shift+Enter for new line · DOCX/PPTX supported", inputPlaceholder: "Ask something...",
+    sysErr: "System Error", connErr: "⚠️ Could not connect to server. Is `node server.js` running?",
+    modelReq: "You must select at least one AI model to ask a question!", delConfirm: "Are you sure you want to delete this chat?"
+  }
+};
+
+let currentLang = localStorage.getItem('sumai_lang') || 'tr';
+
+function setLang(l) {
+  currentLang = l;
+  localStorage.setItem('sumai_lang', l);
+  document.documentElement.lang = l;
+  document.getElementById('langIcon').textContent = l === 'tr' ? '🇹🇷' : '🇬🇧';
+  document.getElementById('langLabel').textContent = l === 'tr' ? 'TR' : 'EN';
+  
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (i18n[l][key]) {
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = i18n[l][key];
+      else el.innerHTML = i18n[l][key];
+    }
+  });
+
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.getElementById('themeLabel').textContent = dark ? i18n[l].themeDark : i18n[l].themeLight;
+
+  if (conversationHistory.length === 0) newChat(true);
+  renderHistory();
+}
+window.toggleLang = () => setLang(currentLang === 'tr' ? 'en' : 'tr');
+
+// Firebase ready promise
+const _fbReady = new Promise(r => { if (window._firebaseReady) r(); else window._firebaseReadyResolve = r; });
+async function waitForFirebase() { await _fbReady; return window._firebaseAuth; }
+
+// ── State ─────────────────────────────────────────
+const modePrompts = {
+  tr: {
+    genel: 'Sen yardımcı, samimi bir Türkçe asistansın. Kısa ve net yanıtlar ver.',
+    ozet: 'Sen bir özetleme uzmanısın. Türkçe olarak metinleri kısa ve net özetle.',
+    analiz: 'Sen bir metin analiz uzmanısın. Türkçe olarak derinlemesine analiz yap.',
+    kod: 'Sen deneyimli bir yazılım geliştiricisisin. Kod sorularına Türkçe açıklama ve kod bloklarıyla yanıt ver.',
+    tercume: 'Sen profesyonel bir çevirmensin. İstenen çeviriyi doğal ve akıcı biçimde yap.',
+  },
+  en: {
+    genel: 'You are a helpful, friendly assistant. Give short and clear answers.',
+    ozet: 'You are a summarization expert. Summarize texts concisely and clearly.',
+    analiz: 'You are a text analysis expert. Provide in-depth analysis.',
+    kod: 'You are an experienced software developer. Answer code questions with explanations and code blocks.',
+    tercume: 'You are a professional translator. Translate naturally and fluently.',
+  }
+};
+
+let currentMode        = 'genel';
+let conversationHistory= [];
+let sessions           = [];
+let currentSessionIdx  = -1;
+let currentPDF         = null;
+let currentImage       = null; // { file, dataURL, name }
+let isLoading          = false;
+let userName           = 'Kullanıcı';
+let userPhotoURL       = null;
+let userId             = 'anon';
+let activeModels       = { gemini: true, gpt: true, ollama: true };
+
+window.toggleModel = function(m) {
+  activeModels[m] = document.getElementById('chk-' + m).checked;
+  if (!activeModels.gemini && !activeModels.gpt && !activeModels.ollama) {
+    alert(i18n[currentLang].modelReq);
+    document.getElementById('chk-' + m).checked = true;
+    activeModels[m] = true;
+  }
+}
+
+// ── Auth tabs ──────────────────────────────────────
+window.switchTab = function(tab) {
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+}
+
+window.loginWithGoogle = async function() {
+  const errEl = document.getElementById('google-error');
+  const btn   = document.querySelector('#panel-google .google-btn');
+
+  errEl.textContent = '';
+  errEl.style.color = 'var(--danger)';
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+
+  const resetBtn = () => { if (btn) { btn.disabled = false; btn.style.opacity = '1'; } };
+
+  try {
+    const auth = await Promise.race([
+      waitForFirebase(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('firebase-timeout')), 8000))
+    ]);
+
+    const provider = new window._GoogleProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    try {
+      await window._signInWithPopup(auth, provider);
+    } catch (popupErr) {
+      if (popupErr.code === 'auth/popup-closed-by-user' ||
+          popupErr.code === 'auth/cancelled-popup-request') {
+        resetBtn(); return;
+      }
+      if (popupErr.code === 'auth/popup-blocked' ||
+          popupErr.message?.includes('Cross-Origin') ||
+          popupErr.message?.includes('cross-origin') ||
+          popupErr.code === 'auth/internal-error') {
+        errEl.style.color = 'var(--accent)';
+        errEl.textContent = '↪ Yönlendiriliyor, lütfen bekleyin...';
+        await window._signInWithRedirect(auth, provider);
+        return;
+      }
+      throw popupErr;
+    }
+  } catch (err) {
+    resetBtn();
+    if (err.message === 'firebase-timeout') {
+      errEl.textContent = 'Firebase yüklenemedi. Sayfayı yenileyip tekrar deneyin.';
+    } else {
+      const codeMap = {
+        'auth/network-request-failed': 'İnternet bağlantısı hatası.',
+        'auth/too-many-requests':      'Çok fazla deneme. Lütfen bekleyin.',
+        'auth/user-disabled':          'Bu hesap devre dışı bırakıldı.',
+      };
+      errEl.textContent = codeMap[err.code] || ('Hata: ' + (err.code || err.message));
+    }
+  }
+}
+
+window.showEmailRegister = function(){ document.getElementById('email-login-view').style.display='none'; document.getElementById('email-reset-view').style.display='none'; document.getElementById('email-register-view').style.display=''; document.getElementById('email-register-error').textContent=''; setTimeout(()=>document.getElementById('regEmailInput').focus(),100); }
+window.showEmailLogin = function()   { document.getElementById('email-register-view').style.display='none'; document.getElementById('email-reset-view').style.display='none'; document.getElementById('email-login-view').style.display=''; document.getElementById('email-error').textContent=''; setTimeout(()=>document.getElementById('emailInput').focus(),100); }
+window.showForgotPassword = function(){ document.getElementById('email-register-view').style.display='none'; document.getElementById('email-login-view').style.display='none'; document.getElementById('email-reset-view').style.display=''; document.getElementById('reset-error').textContent=''; setTimeout(()=>document.getElementById('resetEmailInput').focus(),100); }
+
+function fbErrMsg(code) {
+  const map = {
+    'auth/invalid-email':          { tr: 'Geçersiz e-posta adresi.', en: 'Invalid email address.' },
+    'auth/user-not-found':         { tr: 'Bu e-posta ile kayıtlı hesap yok.', en: 'No account with this email.' },
+    'auth/wrong-password':         { tr: 'Şifre hatalı.', en: 'Wrong password.' },
+    'auth/invalid-credential':     { tr: 'E-posta veya şifre hatalı.', en: 'Incorrect email or password.' },
+    'auth/email-already-in-use':   { tr: 'Bu e-posta zaten kullanımda.', en: 'Email already in use.' },
+    'auth/weak-password':          { tr: 'Şifre en az 6 karakter olmalı.', en: 'Password must be 6+ characters.' },
+    'auth/too-many-requests':      { tr: 'Çok fazla deneme. Bekleyin.', en: 'Too many attempts. Wait.' },
+    'auth/network-request-failed': { tr: 'İnternet bağlantısı hatası.', en: 'Network error.' },
+  };
+  const e = map[code];
+  if (e) return e[currentLang] || e.tr;
+  return (currentLang === 'tr' ? 'Hata: ' : 'Error: ') + (code || 'Bilinmeyen');
+}
+
+window.registerWithEmail = async function() {
+  const errEl = document.getElementById('email-register-error');
+  const btn   = document.getElementById('emailRegisterBtn');
+  errEl.style.color = 'var(--danger)'; errEl.textContent = '';
+  const email = document.getElementById('regEmailInput').value.trim();
+  const pass  = document.getElementById('regPasswordInput').value;
+  if (!email) { errEl.textContent = 'E-posta giriniz.'; return; }
+  if (!pass || pass.length < 6) { errEl.textContent = 'Şifre en az 6 karakter olmalı.'; return; }
+  btn.disabled = true;
+  try { const auth = await waitForFirebase(); await window._createUserWithEmailAndPassword(auth, email, pass); }
+  catch (err) { errEl.textContent = fbErrMsg(err.code); btn.disabled = false; }
+}
+window.loginWithEmail = async function() {
+  const errEl = document.getElementById('email-error');
+  const btn   = document.getElementById('emailLoginBtn');
+  errEl.style.color = 'var(--danger)'; errEl.textContent = '';
+  const email = document.getElementById('emailInput').value.trim();
+  const pass  = document.getElementById('passwordInput').value;
+  if (!email) { errEl.textContent = 'E-posta giriniz.'; return; }
+  if (!pass)  { errEl.textContent = 'Şifre giriniz.'; return; }
+  btn.disabled = true;
+  try { const auth = await waitForFirebase(); await window._signInWithEmailAndPassword(auth, email, pass); }
+  catch (err) { errEl.textContent = fbErrMsg(err.code); btn.disabled = false; }
+}
+window.sendReset = async function() {
+  const errEl = document.getElementById('reset-error'), btn = document.getElementById('resetBtn');
+  errEl.style.color = 'var(--danger)'; errEl.textContent = '';
+  const email = document.getElementById('resetEmailInput').value.trim();
+  if (!email) return;
+  btn.disabled = true;
+  try {
+    const auth = await waitForFirebase();
+    await window._sendPasswordResetEmail(auth, email);
+    errEl.style.color = 'var(--accent)'; errEl.textContent = '✅'; btn.textContent = 'OK';
+  } catch (err) { errEl.style.color='var(--danger)'; errEl.textContent = err.code; btn.disabled = false; }
+}
+
+window.onFirebaseLogin = function(user) {
+  userName = user.displayName || user.email || 'User';
+  userPhotoURL = user.photoURL || null;
+  userId = user.uid || 'anon';
+  document.getElementById('loginOverlay').style.display = 'none';
+  document.getElementById('userAvatarWrap').style.display = 'flex';
+  const el = document.getElementById('userAvatarEl');
+  el.innerHTML = userPhotoURL ? `<img class="user-avatar" src="${userPhotoURL}" referrerpolicy="no-referrer">` : `<div class="user-avatar-placeholder">${userName.charAt(0).toUpperCase()}</div>`;
+  document.getElementById('welcomeUser').textContent = userName;
+  loadSessionsFromStorage(); loadStats(); setLang(currentLang);
+};
+window.onFirebaseLogout = function() {
+  sessions = []; conversationHistory = []; currentSessionIdx = -1; renderHistory();
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('userAvatarWrap').style.display = 'none';
+};
+window.doLogout = async function() { if (window._firebaseAuth && window._signOut) await window._signOut(window._firebaseAuth); }
+
+async function checkStatus() {
+  try {
+    const r = await fetch(`${API}/api/stats?userId=ping`, { signal: AbortSignal.timeout(5000) });
+    if (r.ok) {
+      setStatus(true, i18n[currentLang].online);
+      document.getElementById('modelTag').textContent = i18n[currentLang].online;
+    } else {
+      setStatus(false, 'Error');
+    }
+  } catch {
+    setStatus(false, i18n[currentLang].offline);
+    document.getElementById('modelTag').textContent = i18n[currentLang].connErr;
+  }
+}
+function setStatus(ok,label) {
+  document.getElementById('statusText').textContent = label;
+  const dot = document.getElementById('statusDot');
+  dot.style.background = ok ? 'var(--accent)' : 'var(--danger)';
+  dot.style.animation  = ok ? 'pulse 2s infinite' : 'none';
+}
+setInterval(checkStatus, 15000);
+
+async function loadStats() {
+  try {
+    const r = await fetch(`${API}/api/stats?userId=${encodeURIComponent(userId)}`);
+    const d = await r.json();
+    const total = Object.values(d.votes).reduce((a,b)=>a+b,0);
+    if (!total) return;
+    document.getElementById('statsPanel').style.display = 'block';
+    const colors = { gemini:'#10b981', gpt:'#a855f7', ollama:'#f59e0b' };
+    document.getElementById('statsRows').innerHTML = Object.entries(d.votes).map(([model,count])=>{
+      const pct = total ? Math.round(count/total*100) : 0;
+      return `<div class="stats-row"><div class="stats-model"><span class="race-dot ${model}"></span><span style="color:var(--text-dim)">${model}</span></div><div class="stats-bar"><div class="stats-bar-fill" style="width:${pct}%;background:${colors[model]}"></div></div><span style="color:var(--text-muted);min-width:28px;text-align:right;">${pct}%</span></div>`;
+    }).join('');
+  } catch {}
+}
+
+window.setMode = function(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('mode-'+mode).classList.add('active');
+}
+
+window.uploadFile = async function(e) {
+  const file = e.target.files[0]; if(!file) return;
+  e.target.value = '';
+  const formData = new FormData(); formData.append('file', file);
+  try {
+    const r = await fetch(`${API}/api/upload`, { method:'POST', body:formData });
+    const d = await r.json();
+    if (d.error) { alert('Hata/Error: ' + d.error); return; }
+    currentPDF = { name: file.name, text: d.text };
+    document.getElementById('pdfLabel').textContent = file.name;
+    document.getElementById('pdfBanner').classList.add('on');
+  } catch { alert(i18n[currentLang].connErr); }
+}
+window.removePDF = function() { currentPDF=null; document.getElementById('pdfBanner').classList.remove('on'); }
+
+// ── Resim seçme / kaldırma ─────────────────────
+window.pickImage = function(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    currentImage = { file, dataURL: ev.target.result, name: file.name };
+    document.getElementById('imgPreviewThumb').src = ev.target.result;
+    document.getElementById('imgPreviewName').textContent = file.name;
+    document.getElementById('imgPreviewWrap').classList.add('on');
+  };
+  reader.readAsDataURL(file);
+};
+
+window.removeImage = function() {
+  currentImage = null;
+  document.getElementById('imgPreviewWrap').classList.remove('on');
+  document.getElementById('imgPreviewThumb').src = '';
+};
+
+// msg-wrap'i garantiye alır — welcome silinince div kaybolur
+function ensureMsgWrap() {
+  const msgs = document.getElementById('messages');
+  let wrap = msgs.querySelector('.msg-wrap');
+  if (!wrap) { wrap = document.createElement('div'); wrap.className = 'msg-wrap'; msgs.appendChild(wrap); }
+  return wrap;
+}
+
+window.send = async function() {
+  if (isLoading) return;
+  const input = document.getElementById('userInput');
+  const text  = input.value.trim();
+  if (!text && !currentPDF && !currentImage) return;
+  document.getElementById('welcome')?.remove();
+  ensureMsgWrap(); // welcome silindikten hemen sonra wrap'i oluştur
+
+  const done = () => { isLoading = false; document.getElementById('sendBtn').disabled = false; };
+
+  // ── Resim gönderme yolu ──────────────────────
+  if (currentImage) {
+    const imgFile    = currentImage.file;
+    const imgDataURL = currentImage.dataURL;
+    const displayText = text || (currentLang==='tr' ? 'Bu resmi analiz et.' : 'Analyze this image.');
+
+    addMsgWithImage('user', displayText, imgDataURL);
+    conversationHistory.push({ role:'user', content: displayText });
+    input.value = ''; input.style.height = 'auto';
+    removeImage();
+
+    isLoading = true; document.getElementById('sendBtn').disabled = true;
+    const typing = addTyping();
+
+    try {
+      const formData = new FormData();
+      formData.append('image', imgFile);
+      formData.append('text', displayText);
+      formData.append('systemPrompt', modePrompts[currentLang][currentMode]);
+
+      const r = await fetch(`${API}/api/image`, { method:'POST', body: formData });
+      const d = await r.json();
+      typing.remove();
+
+      const aiText = d.text || 'Hata/Error: ' + (d.error || 'Unknown');
+      conversationHistory.push({ role:'assistant', content: aiText });
+      addMsg('ai', aiText, { model: d.model || 'gemini', allResults: [], cached: false });
+      saveSession(displayText); loadStats();
+    } catch(err) {
+      typing.remove();
+      addMsg('ai', i18n[currentLang].connErr + ' (' + (err.message||'') + ')');
+    }
+    done(); return;
+  }
+
+  // ── Belge / metin gönderme yolu ──────────────
+  const displayText = text || (currentLang==='tr'?'Bu belgeyi analiz et.':'Analyze this document.');
+  const apiContent  = currentPDF ? `[Doc: ${currentPDF.name}]\n${currentPDF.text.slice(0,6000)}\n\n${displayText}` : displayText;
+
+  addMsg('user', displayText);
+  input.value = ''; input.style.height = 'auto';
+  conversationHistory.push({ role:'user', content:apiContent });
+
+  isLoading = true; document.getElementById('sendBtn').disabled = true;
+  const typing = addTyping();
+
+  try {
+    const r = await fetch(`${API}/api/chat`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ messages: conversationHistory, systemPrompt: modePrompts[currentLang][currentMode], userId, activeModels })
+    });
+    const d = await r.json();
+    typing.remove();
+    if (d.error) {
+      // Sunucu hata döndürdü — chat içinde göster
+      let errMsg = d.error;
+      if (errMsg.includes('429') || errMsg.toLowerCase().includes('kota') || errMsg.toLowerCase().includes('quota')) {
+        errMsg = '⚠️ API kotası doldu. Gemini ücretsiz limitine (günde 20 istek) ulaşıldı. ' +
+                 'Seçenekler:\n• GPT-4o-mini veya Ollama modelini seç (sol panel)\n• Birkaç dakika bekle\n• Gemini API\'ye ücretli plan ekle: https://ai.google.dev';
+      } else {
+        errMsg = '⚠️ ' + errMsg;
+      }
+      addMsg('ai', errMsg, { model: 'error' });
+      conversationHistory.pop(); // başarısız isteği geçmişten çıkar
+    } else {
+      const aiText = d.text || '';
+      const model = d.model || 'unknown';
+      conversationHistory.push({ role:'assistant', content: aiText });
+      addMsg('ai', aiText, { model, allResults: d.allResults || [], cached: d.cached || false });
+      saveSession(displayText); loadStats();
+    }
+  } catch(err) {
+    conversationHistory.pop(); // başarısız isteği geçmişten çıkar
+    typing.remove();
+    addMsg('ai', '⚠️ Sunucuya bağlanılamadı. `node server.js` çalışıyor mu? Hata: ' + (err.message||''));
+  }
+  done();
+}
+
+function addMsg(role, text, meta = {}) {
+  const msgs = document.getElementById('messages');
+  const wrap = msgs.querySelector('.msg-wrap') || (() => { const w = document.createElement('div'); w.className='msg-wrap'; msgs.appendChild(w); return w; })();
+  const div = document.createElement('div'); div.className = `message ${role}`;
+  const av = document.createElement('div'); av.className = `avatar ${role}`;
+  if (role === 'ai') av.textContent = '✦'; else if (userPhotoURL) av.innerHTML = `<img src="${userPhotoURL}" referrerpolicy="no-referrer">`; else av.textContent = userName.charAt(0).toUpperCase();
+
+  const body = document.createElement('div'); body.className = 'msg-body';
+  const bubble = document.createElement('div'); bubble.className = 'bubble'; bubble.innerHTML = fmt(text); body.appendChild(bubble);
+
+  if (role === 'ai' && meta.model) {
+    const metaDiv = document.createElement('div'); metaDiv.className = 'msg-meta';
+    const badge = document.createElement('span'); badge.className = `model-badge ${meta.model}`;
+    if (meta.model === 'gemini') badge.textContent = 'gemini-2.5-flash';
+    else if (meta.model === 'gpt') badge.textContent = 'gpt-4o-mini';
+    else if (meta.model === 'ollama') badge.textContent = 'ollama/llama3';
+    else { badge.textContent = i18n[currentLang].sysErr; badge.style.color = 'var(--danger)'; badge.style.borderColor = 'rgba(224, 92, 92, 0.3)'; badge.style.background = 'rgba(224, 92, 92, 0.08)'; }
+    metaDiv.appendChild(badge);
+
+    if (meta.cached) { const c = document.createElement('span'); c.className='cached-badge'; c.textContent='⚡ cache'; metaDiv.appendChild(c); }
+    const voteDiv = document.createElement('div'); voteDiv.className='vote-btns';
+    const upBtn = document.createElement('button'); upBtn.className='vote-btn'; upBtn.textContent='👍'; upBtn.onclick = () => { upBtn.classList.add('voted'); dnBtn.classList.remove('voted'); };
+    const dnBtn = document.createElement('button'); dnBtn.className='vote-btn'; dnBtn.textContent='👎'; dnBtn.onclick = () => { dnBtn.classList.add('voted'); upBtn.classList.remove('voted'); };
+    voteDiv.appendChild(upBtn); voteDiv.appendChild(dnBtn); metaDiv.appendChild(voteDiv); body.appendChild(metaDiv);
+
+    if (meta.allResults && meta.allResults.length > 1) {
+      const raceDiv = document.createElement('div'); raceDiv.className='race-bar';
+      meta.allResults.forEach(r => {
+        const item = document.createElement('span'); item.className='race-item';
+        item.innerHTML = `<span class="race-dot ${r.model}"></span><span class="${r.model === meta.model?'race-winner':''}">${r.model} ${r.latency}ms</span>`;
+        raceDiv.appendChild(item);
+      });
+      body.appendChild(raceDiv);
+    }
+  }
+  div.appendChild(av); div.appendChild(body); wrap.appendChild(div); msgs.scrollTop = msgs.scrollHeight; return div;
+}
+
+// Resimli kullanıcı mesajı ekler
+function addMsgWithImage(role, text, dataURL) {
+  const msgs = document.getElementById('messages');
+  const wrap = msgs.querySelector('.msg-wrap') || (() => { const w = document.createElement('div'); w.className='msg-wrap'; msgs.appendChild(w); return w; })();
+  const div = document.createElement('div'); div.className = `message ${role}`;
+  const av = document.createElement('div'); av.className = `avatar ${role}`;
+  if (userPhotoURL) av.innerHTML = `<img src="${userPhotoURL}" referrerpolicy="no-referrer">`; else av.textContent = userName.charAt(0).toUpperCase();
+
+  const body = document.createElement('div'); body.className = 'msg-body';
+  const bubble = document.createElement('div'); bubble.className = 'bubble';
+  // Önce resim, sonra metin
+  const img = document.createElement('img'); img.className = 'msg-img'; img.src = dataURL; img.alt = 'uploaded';
+  bubble.appendChild(img);
+  if (text) { const p = document.createElement('p'); p.textContent = text; bubble.appendChild(p); }
+  body.appendChild(bubble);
+  div.appendChild(av); div.appendChild(body); wrap.appendChild(div); msgs.scrollTop = msgs.scrollHeight; return div;
+}
+
+function fmt(t) {
+  t = t.replace(/```(\w*)\n?([\s\S]*?)```/g, (_,l,c) => `<pre><code>${c.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>`);
+  t = t.replace(/`([^`]+)`/g,'<code>$1</code>'); t = t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>'); t = t.replace(/\*(.*?)\*/g,'<em>$1</em>');
+  return t.split('\n').map(l => l.trim() ? `<p>${l}</p>` : '').join('');
+}
+
+function addTyping() {
+  const msgs = document.getElementById('messages');
+  const wrap = msgs.querySelector('.msg-wrap') || ensureMsgWrap();
+  const div = document.createElement('div'); div.className='message ai';
+  div.innerHTML = `<div class="avatar ai">✦</div><div class="msg-body"><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div></div>`;
+  wrap.appendChild(div); msgs.scrollTop = msgs.scrollHeight; return div;
+}
+
+window.resize = function(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,130)+'px'; }
+window.onKey = function(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();} }
+window.quick = function(t) { document.getElementById('userInput').value=t; document.getElementById('userInput').focus(); }
+
+window.newChat = function(preserveHistory = false) {
+  if (!preserveHistory) {
+    conversationHistory=[]; currentSessionIdx=-1; currentPDF=null; currentImage=null;
+    document.getElementById('pdfBanner').classList.remove('on');
+    document.getElementById('imgPreviewWrap').classList.remove('on');
+    document.querySelectorAll('.hist-item').forEach(el=>el.classList.remove('active'));
+  }
+  if (conversationHistory.length > 0) return; 
+  
+  const hi = currentLang === 'tr' ? 'Merhaba' : 'Hello';
+  const iam = currentLang === 'tr' ? 'Ben SumAI' : "I'm SumAI";
+  const firstName = userName.split(' ')[0];
+  const d = i18n[currentLang];
+  
+  document.getElementById('messages').innerHTML = `<div class="msg-wrap"><div class="welcome" id="welcome">
+    <div class="welcome-icon">✦</div>
+    <h1>${hi} ${firstName}! ${iam}</h1>
+    <p>${d.welcomeSub}</p>
+    <div class="quick-grid">
+      <div class="quick-card" onclick="quick('${d.q1Q}')"><div class="qc-icon">✍️</div><div class="qc-title">${d.q1T}</div><div class="qc-sub">${d.q1S}</div></div>
+      <div class="quick-card" onclick="quick('${d.q2Q}')"><div class="qc-icon">📄</div><div class="qc-title">${d.q2T}</div><div class="qc-sub">${d.q2S}</div></div>
+      <div class="quick-card" onclick="quick('${d.q3Q}')"><div class="qc-icon">💻</div><div class="qc-title">${d.q3T}</div><div class="qc-sub">${d.q3S}</div></div>
+      <div class="quick-card" onclick="quick('${d.q4Q}')"><div class="qc-icon">🧠</div><div class="qc-title">${d.q4T}</div><div class="qc-sub">${d.q4S}</div></div>
+    </div>
+  </div></div>`;
+}
+
+function storageKey() { return 'sumai_sessions_' + userId; }
+function loadSessionsFromStorage() { try { const saved = localStorage.getItem(storageKey()); sessions = saved ? JSON.parse(saved) : []; } catch(e) { sessions = []; } currentSessionIdx = -1; renderHistory(); }
+function saveSessionsToStorage() { try { localStorage.setItem(storageKey(), JSON.stringify(sessions.slice(0,30).map(s => ({...s, history: s.history.map(m => ({ ...m, content: m.content.slice(0,2000) }))})))); } catch(e) {} }
+function saveSession(firstMsg) {
+  if (currentSessionIdx === -1) {
+    sessions.unshift({ title: firstMsg.slice(0,35)+(firstMsg.length>35?'…':''), time: new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}), history: [...conversationHistory] });
+    currentSessionIdx = 0;
+  } else sessions[currentSessionIdx].history = [...conversationHistory];
+  saveSessionsToStorage(); renderHistory();
+}
+
+function renderHistory() {
+  const el = document.getElementById('histList');
+  if (!sessions.length) { el.innerHTML=`<div class="hist-empty">${i18n[currentLang].noHistory}</div>`; return; }
+  el.innerHTML = sessions.slice(0,20).map((s,i) => `
+    <div class="hist-item-wrap">
+      <div class="hist-item ${i===currentSessionIdx?'active':''}" onclick="loadSession(${i})"><div class="hist-title">${s.title}</div><div class="hist-time">${s.time}</div></div>
+      <button class="hist-del-btn" title="Sil/Delete" onclick="deleteSession(${i}, event)">🗑️</button>
+    </div>
+  `).join('');
+}
+
+window.deleteSession = function(idx, event) {
+  event.stopPropagation();
+  if (confirm(i18n[currentLang].delConfirm)) {
+    sessions.splice(idx, 1); saveSessionsToStorage();
+    if (idx === currentSessionIdx) newChat(); else if (idx < currentSessionIdx) currentSessionIdx--;
+    renderHistory();
+  }
+}
+window.loadSession = function(idx) {
+  currentSessionIdx = idx; conversationHistory = [...sessions[idx].history];
+  document.getElementById('messages').innerHTML = '<div class="msg-wrap"></div>';
+  for (const m of conversationHistory) addMsg(m.role==='user'?'user':'ai', m.content);
+  document.querySelectorAll('.hist-item').forEach((el,i)=>el.classList.toggle('active',i===idx));
+}
+
+window.toggleTheme = function() {
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.documentElement.setAttribute('data-theme', dark?'light':'dark');
+  document.getElementById('themeIcon').textContent = dark ? '🌙' : '☀️';
+  document.getElementById('themeLabel').textContent = dark ? i18n[currentLang].themeDark : i18n[currentLang].themeLight;
+}
+
+// Başlangıç ayarları
+setTimeout(() => { setLang(currentLang); checkStatus(); }, 100);
+</script>
+</body>
+</html>
