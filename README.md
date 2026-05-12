@@ -25,5 +25,5 @@ An intelligent web assistant that lets you dynamically select and race multiple 
 
 ### 1. Clone the repository
 ```bash
-git clone [https://github.com/YOUR_GITHUB_USERNAME/SumAI.git](https://github.com/YOUR_GITHUB_USERNAME/SumAI.git)
+git clone [https://github.com/fatihcayiroglu/SumAI.git](https://github.com/fatihcayiroglu/SumAI.git)
 cd SumAI
